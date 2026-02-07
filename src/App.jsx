@@ -975,10 +975,10 @@ export default function App() {
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 <input
-                  className={`w-full rounded-xl border bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:ring-2 ${
+                  className={`w-full rounded-xl border px-3 py-2 text-sm shadow-sm outline-none transition focus:ring-2 ${
                     highContrast
-                      ? "border-slate-700 bg-slate-900/60 text-slate-100 focus:border-slate-500 focus:ring-slate-700"
-                      : "border-slate-200 focus:border-slate-400 focus:ring-slate-200"
+                      ? "border-slate-600 bg-slate-800 text-slate-100 placeholder-slate-400 focus:border-slate-400 focus:ring-slate-600"
+                      : "border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:border-slate-400 focus:ring-slate-200"
                   }`}
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
