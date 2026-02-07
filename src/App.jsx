@@ -882,17 +882,21 @@ export default function App() {
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Tu ejercicio de hoy</h2>
-            <div className={`flex items-center gap-2 text-xs ${subtleText}`}>
+            <div className="flex items-center gap-2 text-xs">
               <span
-                className={`rounded-full border bg-white/80 px-2 py-1 ${
-                  highContrast ? "border-slate-700 bg-slate-900/70" : borderMuted
+                className={`rounded-full border px-2 py-1 ${
+                  highContrast
+                    ? "border-slate-600 bg-slate-800 text-slate-100"
+                    : "border-slate-200 bg-white text-slate-700"
                 }`}
               >
                 Fallados ayer: {failedYesterdayIds.length}
               </span>
               <span
-                className={`rounded-full border bg-white/80 px-2 py-1 ${
-                  highContrast ? "border-slate-700 bg-slate-900/70" : borderMuted
+                className={`rounded-full border px-2 py-1 ${
+                  highContrast
+                    ? "border-slate-600 bg-slate-800 text-slate-100"
+                    : "border-slate-200 bg-white text-slate-700"
                 }`}
               >
                 Hoy: {remainingToday}
