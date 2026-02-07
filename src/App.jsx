@@ -32,17 +32,20 @@ const MODULES = [
   { id: "health", label: "Salud" },
   { id: "education", label: "Educacion" },
   { id: "technology", label: "Tecnologia" },
+  { id: "ai", label: "IA" },
   { id: "questions", label: "Preguntas" },
   { id: "irregular-verbs", label: "Irregulares" },
   { id: "collocations", label: "Collocations" },
 ];
 
-const LEVELS = ["A1", "A2", "B1", "B2"];
+const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
 const LEVEL_RANK = {
   A1: 1,
   A2: 2,
   B1: 3,
   B2: 4,
+  C1: 5,
+  C2: 6,
 };
 
 const TOPIC_TIPS = {
@@ -56,6 +59,10 @@ const TOPIC_TIPS = {
     "Tip: if + presente, will + verbo para futuro simple.",
   collocations:
     "Tip: ciertas palabras van juntas en ingles (make a decision, do homework).",
+  technology:
+    "Tip: en temas tech, prioriza verbos de accion y sustantivos precisos (latency, throughput, rollback).",
+  ai:
+    "Tip: en IA, usa vocabulario general como model, data, bias y accuracy.",
 };
 
 function defaultProgress() {
@@ -81,7 +88,7 @@ function hintFromAnswer(answer, level) {
   const rawWords = String(base).trim().split(/\s+/).filter(Boolean);
   if (rawWords.length === 0) return "";
 
-  if (level === "B2") {
+  if (level === "B2" || level === "C1" || level === "C2") {
     const first = rawWords[0] || "";
     return `${first[0] || ""}... (${rawWords.length} palabras)`;
   }
