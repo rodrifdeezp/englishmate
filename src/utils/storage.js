@@ -1,4 +1,4 @@
-const STORAGE_KEY = "daily_english_state_v1";
+const STORAGE_KEY = "daily_english_state_v2";
 
 export function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
