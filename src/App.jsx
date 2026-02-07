@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { EXERCISES } from "./data/exercises.js";
 import { loadState, saveState } from "./utils/storage.js";
 import { checkAnswer } from "./utils/checker.js";
@@ -13,6 +13,9 @@ const DAILY_LIMIT = 12; // around 10 minutes
 const REMOTE_EXERCISES_URL = ""; // Example: "https://raw.githubusercontent.com/user/repo/main/exercises.json"
 const UI_PREFS_KEY = "daily_english_ui_prefs_v1";
 const SERIES_LENGTH = 10;
+const QUICK_REVIEW_LIMIT = 3;
+const WEEK_GOAL = 4;
+const SWIPE_THRESHOLD = 60;
 
 const MODULES = [
   { id: "all", label: "Todo" },
@@ -31,6 +34,7 @@ const MODULES = [
   { id: "technology", label: "Tecnologia" },
   { id: "questions", label: "Preguntas" },
   { id: "irregular-verbs", label: "Irregulares" },
+  { id: "collocations", label: "Collocations" },
 ];
 
 const LEVELS = ["A1", "A2", "B1", "B2"];
@@ -41,12 +45,26 @@ const LEVEL_RANK = {
   B2: 4,
 };
 
+const TOPIC_TIPS = {
+  prepositions:
+    "Tip: usa at para lugares puntuales, in para ciudades/paises, on para superficies.",
+  "phrasal-verbs":
+    "Tip: los phrasal verbs cambian el significado del verbo base.",
+  "modal-verbs":
+    "Tip: los modales van antes del verbo principal (no llevan 'to').",
+  conditionals:
+    "Tip: if + presente, will + verbo para futuro simple.",
+  collocations:
+    "Tip: ciertas palabras van juntas en ingles (make a decision, do homework).",
+};
+
 function defaultProgress() {
   return {
     attempts: 0,
     failures: 0,
     lastFailedAt: null,
     masteryLevel: 0,
+    lastConfidence: null,
   };
 }
 
@@ -102,20 +120,47 @@ function pickFocusTopic(exercises, progressById) {
   return sorted[0]?.[0] || null;
 }
 
-function alternateByType(items) {
-  const remaining = [...items];
-  const output = [];
-  let lastType = null;
-
-  while (remaining.length > 0) {
-    let index = remaining.findIndex((item) => item.type !== lastType);
-    if (index === -1) index = 0;
-    const [next] = remaining.splice(index, 1);
-    output.push(next);
-    lastType = next.type;
+function hashString(input) {
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash << 5) - hash + input.charCodeAt(i);
+    hash |= 0;
   }
+  return Math.abs(hash);
+}
 
-  return output;
+function seededRandom(seed) {
+  let t = seed + 0x6d2b79f5;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+function shuffleWithSeed(items, seedKey) {
+  const result = [...items];
+  let seed = hashString(seedKey);
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    seed += 1;
+    const j = Math.floor(seededRandom(seed) * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+function getRecentDays(count) {
+  const days = [];
+  const now = new Date();
+  for (let i = 0; i < count; i += 1) {
+    const date = new Date(now);
+    date.setDate(now.getDate() - i);
+    days.push(date.toISOString().slice(0, 10));
+  }
+  return days.reverse();
+}
+
+function markActivityDay(activityDays, dateKey) {
+  if (activityDays.includes(dateKey)) return activityDays;
+  return [...activityDays, dateKey];
 }
 
 function getExtraExample(exercises, current) {
@@ -145,7 +190,13 @@ async function fetchRemoteExercises(url) {
   }
 }
 
-function buildDailyQueue(exercises, progressById, moduleId, levelCap) {
+function buildDailyQueue(
+  exercises,
+  progressById,
+  moduleId,
+  levelCap,
+  limitOverride
+) {
   const filteredByLevel = levelCap
     ? exercises.filter((ex) => (LEVEL_RANK[ex.level] || 1) <= levelCap)
     : exercises;
@@ -174,14 +225,32 @@ function buildDailyQueue(exercises, progressById, moduleId, levelCap) {
     ? pool.filter((ex) => ex.topic === focusTopic && !isMastered(progressById[ex.id]))
     : [];
 
-  const baseQueue = [...failedYesterday, ...unmasteredSeen, ...newItems];
+  const baseQueue = [...unmasteredSeen, ...newItems];
   const merged = [
     ...focusItems.slice(0, 3),
     ...baseQueue.filter((ex) => !focusItems.some((fi) => fi.id === ex.id)),
   ];
-  const alternated = alternateByType(merged);
-  const limit = moduleId && moduleId !== "all" ? SERIES_LENGTH : DAILY_LIMIT;
-  return alternated.slice(0, limit);
+  const randomized = shuffleWithSeed(
+    merged,
+    `${todayKey()}|${moduleId || "all"}|${levelCap || "all"}`
+  );
+  const limit =
+    typeof limitOverride === "number"
+      ? limitOverride
+      : moduleId && moduleId !== "all"
+        ? SERIES_LENGTH
+        : DAILY_LIMIT;
+  return [...failedYesterday, ...randomized].slice(0, limit);
+}
+
+function pickDailyChallenge(exercises, levelCap) {
+  const pool = levelCap
+    ? exercises.filter((ex) => (LEVEL_RANK[ex.level] || 1) <= levelCap)
+    : exercises;
+  if (pool.length === 0) return null;
+  const seedKey = `challenge|${todayKey()}`;
+  const shuffled = shuffleWithSeed(pool, seedKey);
+  return shuffled[0];
 }
 
 export default function App() {
@@ -227,7 +296,17 @@ export default function App() {
       return LEVEL_RANK.A1;
     }
   });
-  const [fontScale] = useState(16);
+  const [speechRate, setSpeechRate] = useState(() => {
+    try {
+      const raw = localStorage.getItem(UI_PREFS_KEY);
+      if (!raw) return 1;
+      const parsed = JSON.parse(raw);
+      return Number(parsed?.speechRate) || 1;
+    } catch {
+      return 1;
+    }
+  });
+  const [confidence, setConfidence] = useState(2);
   const [state, setState] = useState(() => {
     const today = todayKey();
     if (saved && saved.session && isSameDay(saved.lastSessionDate, today)) {
@@ -236,7 +315,12 @@ export default function App() {
 
     // New day: build a fresh queue.
     const progressById = saved?.progressById || {};
-    const queue = buildDailyQueue(EXERCISES, progressById, moduleId, levelCap);
+    const queue = buildDailyQueue(
+      EXERCISES,
+      progressById,
+      moduleId,
+      levelCap
+    );
     const completedYesterday =
       saved?.session?.completed > 0 && saved?.lastSessionDate === yesterdayKey();
     const streakDays = completedYesterday ? (saved?.streakDays || 0) + 1 : 0;
@@ -245,17 +329,21 @@ export default function App() {
       progressById,
       lastSessionDate: today,
       streakDays,
+      activityDays: saved?.activityDays || [],
       session: {
         date: today,
         queueIds: queue.map((ex) => ex.id),
         index: 0,
         completed: 0,
+        moduleId,
+        levelCap,
       },
     };
   });
 
   const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState(null);
+  const [isLoadingQueue, setIsLoadingQueue] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -277,28 +365,47 @@ export default function App() {
       highContrast,
       moduleId,
       levelCap,
+      speechRate,
     };
     localStorage.setItem(UI_PREFS_KEY, JSON.stringify(nextPrefs));
-  }, [focusMode, highContrast, moduleId, levelCap]);
+  }, [focusMode, highContrast, moduleId, levelCap, speechRate]);
 
   useEffect(() => {
-    const queue = buildDailyQueue(
-      exercises,
-      state.progressById,
-      moduleId,
-      levelCap
-    );
-    const nextState = {
-      ...state,
-      lastSessionDate: todayKey(),
-      session: {
-        date: todayKey(),
-        queueIds: queue.map((ex) => ex.id),
-        index: 0,
-        completed: 0,
-      },
-    };
-    persist(nextState);
+    const sessionMatchesFilters =
+      state.session?.moduleId === moduleId &&
+      state.session?.levelCap === levelCap &&
+      isSameDay(state.session?.date, todayKey());
+
+    if (sessionMatchesFilters) return undefined;
+
+    setIsLoadingQueue(true);
+    setAnswer("");
+    setFeedback(null);
+
+    const timeoutId = setTimeout(() => {
+      const queue = buildDailyQueue(
+        exercises,
+        state.progressById,
+        moduleId,
+        levelCap
+      );
+      const nextState = {
+        ...state,
+        lastSessionDate: todayKey(),
+        session: {
+          date: todayKey(),
+          queueIds: queue.map((ex) => ex.id),
+          index: 0,
+          completed: 0,
+          moduleId,
+          levelCap,
+        },
+      };
+      persist(nextState);
+      setIsLoadingQueue(false);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
   }, [moduleId, exercises, levelCap]);
 
   function resetUIPreferences() {
@@ -306,6 +413,7 @@ export default function App() {
     setHighContrast(false);
     setModuleId("all");
     setLevelCap(LEVEL_RANK.A1);
+    setSpeechRate(1);
     localStorage.removeItem(UI_PREFS_KEY);
   }
 
@@ -313,16 +421,19 @@ export default function App() {
     .map((id) => exercises.find((ex) => ex.id === id))
     .filter(Boolean);
   const current = queue[state.session.index];
+  const dailyChallenge = pickDailyChallenge(exercises, levelCap);
+  const touchStart = useRef({ x: 0, y: 0 });
 
   function persist(next) {
     setState(next);
     saveState(next);
   }
 
-  function updateProgress(exercise, isCorrect) {
+  function updateProgress(exercise, isCorrect, confidenceLevel) {
     const currentProgress = state.progressById[exercise.id] || defaultProgress();
     const nextProgress = { ...currentProgress };
     nextProgress.attempts += 1;
+    nextProgress.lastConfidence = confidenceLevel ?? null;
 
     if (isCorrect) {
       nextProgress.masteryLevel = Math.min(
@@ -348,9 +459,10 @@ export default function App() {
       !isForgotten && checkAnswer(answer, current.answer, current.synonyms);
     const extraExample = !isCorrect ? getExtraExample(exercises, current) : null;
 
+    const previousProgress = state.progressById[current.id] || defaultProgress();
     const nextProgress = {
       ...state.progressById,
-      [current.id]: updateProgress(current, isCorrect),
+      [current.id]: updateProgress(current, isCorrect, confidence),
     };
 
     const nextSession = {
@@ -358,14 +470,21 @@ export default function App() {
       completed: Math.min(state.session.completed + 1, queue.length),
     };
 
+    const isSessionComplete = nextSession.completed >= queue.length && queue.length > 0;
+    const nextActivityDays = isSessionComplete
+      ? markActivityDay(state.activityDays || [], todayKey())
+      : state.activityDays || [];
+
     const nextState = {
       ...state,
       progressById: nextProgress,
       lastSessionDate: todayKey(),
+      activityDays: nextActivityDays,
       session: nextSession,
     };
 
     persist(nextState);
+    setConfidence(2);
 
     setFeedback({
       ok: isCorrect,
@@ -378,6 +497,13 @@ export default function App() {
           }`,
       hint: isCorrect ? null : hintFromAnswer(current.answer, current.level),
       extraExample,
+      masteryDelta: isCorrect
+        ? Math.round(
+            ((nextProgress[current.id]?.masteryLevel || 0) -
+              (previousProgress?.masteryLevel || 0)) *
+              100
+          )
+        : 0,
     });
   }
 
@@ -416,6 +542,14 @@ export default function App() {
         !isMastered(state.progressById[ex.id])
     )
     .map((ex) => ex.id);
+  const recentDays = getRecentDays(7);
+  const completedRecent = recentDays.filter((day) =>
+    (state.activityDays || []).includes(day)
+  ).length;
+  const weeklyProgress = Math.min(
+    100,
+    Math.round((completedRecent / WEEK_GOAL) * 100)
+  );
 
   function speakCurrent() {
     if (!current) return;
@@ -427,6 +561,7 @@ export default function App() {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "en-US";
+    utterance.rate = speechRate;
     window.speechSynthesis.speak(utterance);
   }
   const failuresByTopic = exercises.reduce((acc, ex) => {
@@ -520,6 +655,23 @@ export default function App() {
                   <p className="text-lg font-semibold">
                     {state.streakDays || 0} dias
                   </p>
+                  <div className="mt-2 grid grid-cols-7 gap-1">
+                    {getRecentDays(7).map((day) => (
+                      <span
+                        key={day}
+                        className={`h-2 rounded-full ${
+                          (state.activityDays || []).includes(day)
+                            ? highContrast
+                              ? "bg-emerald-400"
+                              : "bg-emerald-600"
+                            : highContrast
+                              ? "bg-slate-700"
+                              : "bg-slate-200"
+                        }`}
+                        title={day}
+                      />
+                    ))}
+                  </div>
                 </div>
                 <div
                   className={`rounded-2xl border px-3 py-2 text-sm shadow-sm ${surfaceClass}`}
@@ -539,6 +691,24 @@ export default function App() {
                     <span className="text-xs font-semibold">
                       {masteryPercent}%
                     </span>
+                  </div>
+                  <div className="mt-2">
+                    <p className="text-xs uppercase tracking-wide opacity-70">
+                      Semana
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-full rounded-full bg-slate-200/60">
+                        <div
+                          className={`h-2 rounded-full ${
+                            highContrast ? "bg-slate-200" : "bg-slate-900"
+                          }`}
+                          style={{ width: `${weeklyProgress}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-semibold">
+                        {completedRecent}/{WEEK_GOAL}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -579,16 +749,99 @@ export default function App() {
                     ))}
                   </select>
                 </label>
+                <button
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                    highContrast
+                      ? "border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                  }`}
+                  onClick={() =>
+                    setSpeechRate((prev) => (prev === 1 ? 0.8 : 1))
+                  }
+                >
+                  Audio: {speechRate === 1 ? "Normal" : "Lento"}
+                </button>
+                <button
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                    highContrast
+                      ? "border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                  }`}
+                  onClick={() => {
+                    const quickQueue = buildDailyQueue(
+                      exercises,
+                      state.progressById,
+                      moduleId,
+                      levelCap,
+                      QUICK_REVIEW_LIMIT
+                    );
+                    setAnswer("");
+                    setFeedback(null);
+                    persist({
+                      ...state,
+                      session: {
+                        date: todayKey(),
+                        queueIds: quickQueue.map((ex) => ex.id),
+                        index: 0,
+                        completed: 0,
+                      },
+                    });
+                  }}
+                >
+                  Repaso rapido
+                </button>
+                {dailyChallenge && (
+                  <button
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                      highContrast
+                        ? "border-amber-500/60 bg-amber-900/40 text-amber-200 hover:border-amber-300"
+                        : "border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300"
+                    }`}
+                    onClick={() => {
+                      const ids = state.session.queueIds.filter(
+                        (id) => id !== dailyChallenge.id
+                      );
+                      persist({
+                        ...state,
+                        session: {
+                          ...state.session,
+                          queueIds: [dailyChallenge.id, ...ids],
+                          index: 0,
+                          completed: 0,
+                        },
+                      });
+                    }}
+                  >
+                    Reto del dia
+                  </button>
+                )}
                 <span className={subtleText}>
                   Serie: {selectedModule.label}
                 </span>
               </div>
+              {dailyChallenge && (
+                <p className={`pt-2 text-xs ${subtleText}`}>
+                  Reto del dia: {dailyChallenge.prompt}
+                </p>
+              )}
             </>
           )}
         </header>
 
         <section
           className={`rounded-2xl border p-4 shadow-sm backdrop-blur sm:p-5 ${surfaceClass}`}
+          onTouchStart={(event) => {
+            const touch = event.touches[0];
+            touchStart.current = { x: touch.clientX, y: touch.clientY };
+          }}
+          onTouchEnd={(event) => {
+            const touch = event.changedTouches[0];
+            const deltaX = touch.clientX - touchStart.current.x;
+            const deltaY = touch.clientY - touchStart.current.y;
+            if (Math.abs(deltaX) > Math.abs(deltaY) && deltaX < -SWIPE_THRESHOLD) {
+              nextExercise();
+            }
+          }}
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Tu ejercicio de hoy</h2>
@@ -618,7 +871,14 @@ export default function App() {
             }`}
           />
 
-          {!current ? (
+          {isLoadingQueue ? (
+            <div className="mt-4 space-y-3 animate-pulse">
+              <div className="h-4 w-24 rounded bg-slate-200/70" />
+              <div className="h-6 w-full rounded bg-slate-200/70" />
+              <div className="h-10 w-full rounded bg-slate-200/70" />
+              <div className="h-9 w-32 rounded bg-slate-200/70" />
+            </div>
+          ) : !current ? (
             <p className={`mt-4 text-sm ${subtleText}`}>
               Terminaste por hoy. Manana veras primero lo que fallaste ayer.
             </p>
@@ -656,6 +916,36 @@ export default function App() {
                 </div>
               )}
               <p className="text-lg font-medium">{current.prompt}</p>
+              {!focusMode && TOPIC_TIPS[current.topic] && (
+                <p className={`text-xs ${subtleText}`}>
+                  {TOPIC_TIPS[current.topic]}
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className={subtleText}>Confianza</span>
+                {[
+                  { value: 1, label: "Baja" },
+                  { value: 2, label: "Media" },
+                  { value: 3, label: "Alta" },
+                ].map((item) => (
+                  <button
+                    key={item.value}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                      confidence === item.value
+                        ? highContrast
+                          ? "border-emerald-400 bg-emerald-900/50 text-emerald-200"
+                          : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : highContrast
+                          ? "border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                    }`}
+                    onClick={() => setConfidence(item.value)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 <input
@@ -739,6 +1029,11 @@ export default function App() {
                   {feedback.hint && (
                     <p className={`text-xs ${subtleText}`}>
                       Pista: {feedback.hint}
+                    </p>
+                  )}
+                  {feedback.masteryDelta > 0 && (
+                    <p className={`text-xs ${subtleText}`}>
+                      Mejoraste +{feedback.masteryDelta}% de dominio.
                     </p>
                   )}
                   {feedback.extraExample && (

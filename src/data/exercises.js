@@ -562,6 +562,40 @@ export const EXERCISES = [
     prompt: "I will ____ (call) you later.",
     answer: ["call"],
   },
+  // Collocations
+  {
+    id: "ex-126",
+    type: "translation",
+    level: "A2",
+    topic: "collocations",
+    prompt: "Tomar una decision",
+    answer: "Make a decision",
+  },
+  {
+    id: "ex-127",
+    type: "translation",
+    level: "A2",
+    topic: "collocations",
+    prompt: "Hacer la tarea",
+    answer: "Do homework",
+  },
+  {
+    id: "ex-128",
+    type: "translation",
+    level: "A2",
+    topic: "collocations",
+    prompt: "Hacer una llamada",
+    answer: "Make a call",
+    synonyms: ["Make a phone call"],
+  },
+  {
+    id: "ex-129",
+    type: "translation",
+    level: "A2",
+    topic: "collocations",
+    prompt: "Hacer ejercicio",
+    answer: "Do exercise",
+  },
   // Questions
   {
     id: "ex-130",
