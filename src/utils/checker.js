@@ -62,7 +62,11 @@ export const checkAnswer = (userInput, correctAnswer, synonyms = []) => {
   };
 
   const clean = (str) => {
-    const lower = (str || "").toLowerCase().trim();
+    const normalized = (str || "")
+      .replace(/[‘’‛`´]/g, "'")
+      .replace(/[“”„‟]/g, '"')
+      .replace(/\u00A0/g, " ");
+    const lower = normalized.toLowerCase().trim();
     const expanded = expandContractions(lower);
     return expanded
       .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "")
