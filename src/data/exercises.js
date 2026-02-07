@@ -346,7 +346,7 @@ export const EXERCISES = [
     type: "translation",
     level: "A2",
     topic: "work",
-    prompt: "Podemos discutir esto manana",
+    prompt: "Podemos discutir esto mañana",
     answer: "We can discuss this tomorrow",
   },
   {

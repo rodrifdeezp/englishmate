@@ -917,7 +917,7 @@ export default function App() {
             </div>
           ) : !current ? (
             <p className={`mt-4 text-sm ${subtleText}`}>
-              Terminaste por hoy. Manana veras primero lo que fallaste ayer.
+              Terminaste por hoy. mañana veras primero lo que fallaste ayer.
             </p>
           ) : (
             <div className="mt-4 space-y-4">
@@ -1077,7 +1077,7 @@ export default function App() {
             <h3 className="text-lg font-semibold">Para repasar</h3>
             {failedYesterdayIds.length === 0 && unmasteredIds.length === 0 ? (
               <p className={`mt-2 text-sm ${subtleText}`}>
-                Todo dominado. Manana se desbloquean nuevos ejercicios.
+                Todo dominado. mañana se desbloquean nuevos ejercicios.
               </p>
             ) : (
               <ul className={`mt-2 list-disc pl-5 text-sm ${subtleText}`}>
