@@ -37,6 +37,16 @@ const VOCABULARY = [
   { id: "v-023", es: "apagar", en: "turn off", level: "A2", topic: "phrasal-verbs" },
   { id: "v-024", es: "continuar", en: "carry on", level: "B1", topic: "phrasal-verbs" },
   { id: "v-025", es: "averiguar", en: "find out", level: "B1", topic: "phrasal-verbs" },
+  { id: "v-026", es: "posponer", en: "put off", level: "B1", topic: "work" },
+  { id: "v-027", es: "rechazar", en: "turn down", level: "B2", topic: "work" },
+  { id: "v-028", es: "encargarse de", en: "deal with", level: "B1", topic: "work" },
+  { id: "v-029", es: "quedarse sin", en: "run out of", level: "B1", topic: "daily-life" },
+  { id: "v-030", es: "parecerse a", en: "take after", level: "B2", topic: "family" },
+  { id: "v-031", es: "asunto/tema", en: "issue", level: "B1", topic: "work" },
+  { id: "v-032", es: "ventaja", en: "advantage", level: "A2", topic: "general" },
+  { id: "v-033", es: "desventaja", en: "drawback", level: "B2", topic: "general" },
+  { id: "v-034", es: "metas", en: "goals", level: "B1", topic: "work" },
+  { id: "v-035", es: "actualmente", en: "currently", level: "B1", topic: "time" },
 ];
 
 function generateFromVocab(vocab) {
@@ -52,6 +62,39 @@ function generateFromVocab(vocab) {
 }
 
 const GENERATED_EXERCISES = generateFromVocab(VOCABULARY);
+
+const IRREGULAR_VERBS = [
+  { id: "ir-001", base: "go", past: "went", es: "ir", level: "A2" },
+  { id: "ir-002", base: "eat", past: "ate", es: "comer", level: "A2" },
+  { id: "ir-003", base: "see", past: "saw", es: "ver", level: "A2" },
+  { id: "ir-004", base: "take", past: "took", es: "tomar", level: "A2" },
+  { id: "ir-005", base: "come", past: "came", es: "venir", level: "A2" },
+  { id: "ir-006", base: "give", past: "gave", es: "dar", level: "B1" },
+  { id: "ir-007", base: "write", past: "wrote", es: "escribir", level: "B1" },
+  { id: "ir-008", base: "drive", past: "drove", es: "conducir", level: "B1" },
+  { id: "ir-009", base: "bring", past: "brought", es: "traer", level: "B1" },
+  { id: "ir-010", base: "buy", past: "bought", es: "comprar", level: "A2" },
+  { id: "ir-011", base: "catch", past: "caught", es: "atrapar/coger", level: "B1" },
+  { id: "ir-012", base: "choose", past: "chose", es: "elegir", level: "B1" },
+  { id: "ir-013", base: "fall", past: "fell", es: "caer", level: "A2" },
+  { id: "ir-014", base: "feel", past: "felt", es: "sentir", level: "A2" },
+  { id: "ir-015", base: "keep", past: "kept", es: "mantener", level: "B1" },
+  { id: "ir-016", base: "understand", past: "understood", es: "entender", level: "A2" },
+];
+
+function generateIrregularExercises(list) {
+  return list.map((verb) => ({
+    id: `gen-${verb.id}`,
+    type: "fill",
+    level: verb.level,
+    topic: "irregular-verbs",
+    prompt: `Past simple de "${verb.base}" (${verb.es}): ____`,
+    answer: [verb.past],
+    note: "Generado desde verbos irregulares",
+  }));
+}
+
+const IRREGULAR_EXERCISES = generateIrregularExercises(IRREGULAR_VERBS);
 
 export const EXERCISES = [
   // Translation / phrases
@@ -689,7 +732,147 @@ export const EXERCISES = [
     prompt: "Gira a la izquierda",
     answer: "Turn left",
   },
+  {
+    id: "ex-200",
+    type: "translation",
+    level: "B2",
+    topic: "work",
+    prompt: "Pongámonos al día con el proyecto",
+    answer: "Let's catch up on the project",
+    synonyms: ["Let's get up to date with the project"]
+  },
+  {
+    id: "ex-201",
+    type: "phrase",
+    level: "B1",
+    topic: "work",
+    prompt: "Quedo a la espera de sus noticias",
+    answer: "I look forward to hearing from you",
+    note: "Frase estándar para cerrar emails formales."
+  },
+  {
+    id: "ex-202",
+    type: "fill",
+    level: "B2",
+    topic: "work",
+    prompt: "We need to ___ (investigar) the cause of the problem.",
+    answer: ["look into"],
+    note: "Phrasal verb común en entornos técnicos."
+  },
+  {
+    id: "ex-203",
+    type: "translation",
+    level: "B2",
+    topic: "work",
+    prompt: "Aclaremos los detalles antes de firmar",
+    answer: "Let's iron out the details before signing",
+    synonyms: ["Let's clear up the details"]
+  },
+
+  // PHRASAL VERBS AVANZADOS (B1-B2)
+  {
+    id: "ex-210",
+    type: "fill",
+    level: "B1",
+    topic: "phrasal-verbs",
+    prompt: "The meeting was ___ (cancelada) due to the strike.",
+    answer: ["called off"],
+    note: "Call off = Cancelar algo planeado."
+  },
+  {
+    id: "ex-211",
+    type: "translation",
+    level: "B2",
+    topic: "phrasal-verbs",
+    prompt: "Se me ocurrió una idea genial",
+    answer: "I came up with a great idea",
+  },
+  {
+    id: "ex-212",
+    type: "fill",
+    level: "B2",
+    topic: "phrasal-verbs",
+    prompt: "I can't ___ (tolerar) this noise anymore.",
+    answer: ["put up with"],
+    note: "Put up with = Soportar o tolerar."
+  },
+
+  // GRAMÁTICA: CONDICIONALES (B1-B2)
+  {
+    id: "ex-220",
+    type: "fill",
+    level: "B2",
+    topic: "conditionals",
+    prompt: "If I ___ (know) you were coming, I would have baked a cake.",
+    answer: ["had known"],
+    note: "Tercera condicional: situaciones hipotéticas del pasado."
+  },
+  {
+    id: "ex-221",
+    type: "translation",
+    level: "B1",
+    topic: "conditionals",
+    prompt: "Si yo fuera tú, no lo haría",
+    answer: "If I were you, I wouldn't do it",
+    synonyms: ["If I were you, I would not do it"]
+  },
+
+  // IDIOMS & COMMON EXPRESSIONS
+  {
+    id: "ex-230",
+    type: "translation",
+    level: "B2",
+    topic: "idioms",
+    prompt: "Eso es pan comido",
+    answer: "That's a piece of cake",
+    synonyms: ["It's a piece of cake"]
+  },
+  {
+    id: "ex-231",
+    type: "phrase",
+    level: "B1",
+    topic: "idioms",
+    prompt: "Me suena de algo",
+    answer: "It rings a bell",
+  },
+  {
+    id: "ex-232",
+    type: "translation",
+    level: "B2",
+    topic: "idioms",
+    prompt: "Cuesta un ojo de la cara",
+    answer: "It costs an arm and a leg",
+  },
+
+  // DAILY LIFE (MÁS VARIEDAD)
+  {
+    id: "ex-240",
+    type: "translation",
+    level: "A2",
+    topic: "daily-life",
+    prompt: "¿Cómo has estado?",
+    answer: "How have you been?",
+  },
+  {
+    id: "ex-241",
+    type: "phrase",
+    level: "B1",
+    topic: "daily-life",
+    prompt: "No te preocupes, no importa",
+    answer: "Never mind",
+    synonyms: ["Don't worry, it doesn't matter"]
+  },
+  {
+    id: "ex-242",
+    type: "fill",
+    level: "B1",
+    topic: "prepositions",
+    prompt: "I am fed up ___ my job.",
+    answer: ["with"],
+    note: "Be fed up with = Estar harto de algo."
+  },
   ...GENERATED_EXERCISES,
+  ...IRREGULAR_EXERCISES,
 ];
 
 export const EXERCISE_REMOTE_SHAPE = {
