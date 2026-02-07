@@ -10,91 +10,37 @@
 //   note?: string
 // }
 
-// Base vocabulary list (for auto-generated exercises).
-const VOCABULARY = [
-  { id: "v-001", es: "tarde", en: "late", level: "A1", topic: "daily-life" },
-  { id: "v-002", es: "acuerdo", en: "agree", level: "A1", topic: "daily-life" },
-  { id: "v-003", es: "tiempo", en: "time", level: "A1", topic: "daily-life" },
-  { id: "v-004", es: "encender", en: "turn on", level: "A2", topic: "phrasal-verbs" },
-  { id: "v-005", es: "buscar", en: "look for", level: "A2", topic: "phrasal-verbs" },
-  { id: "v-006", es: "salir", en: "go out", level: "A1", topic: "daily-life" },
-  { id: "v-007", es: "volver", en: "come back", level: "A1", topic: "daily-life" },
-  { id: "v-008", es: "pagar", en: "pay", level: "A1", topic: "daily-life" },
-  { id: "v-009", es: "aprender", en: "learn", level: "A1", topic: "education" },
-  { id: "v-010", es: "estudiar", en: "study", level: "A1", topic: "education" },
-  { id: "v-011", es: "comprar", en: "buy", level: "A1", topic: "shopping" },
-  { id: "v-012", es: "vender", en: "sell", level: "A2", topic: "shopping" },
-  { id: "v-013", es: "pedir", en: "order", level: "A1", topic: "food" },
-  { id: "v-014", es: "cambiar", en: "change", level: "A1", topic: "daily-life" },
-  { id: "v-015", es: "arreglar", en: "fix", level: "A2", topic: "daily-life" },
-  { id: "v-016", es: "reunirse", en: "meet", level: "A1", topic: "work" },
-  { id: "v-017", es: "discutir", en: "discuss", level: "A2", topic: "work" },
-  { id: "v-018", es: "entregar", en: "deliver", level: "A2", topic: "work" },
-  { id: "v-019", es: "reservar", en: "book", level: "A2", topic: "travel" },
-  { id: "v-020", es: "cancelar", en: "cancel", level: "A2", topic: "travel" },
-  { id: "v-021", es: "subir", en: "go up", level: "A2", topic: "phrasal-verbs" },
-  { id: "v-022", es: "bajar", en: "go down", level: "A2", topic: "phrasal-verbs" },
-  { id: "v-023", es: "apagar", en: "turn off", level: "A2", topic: "phrasal-verbs" },
-  { id: "v-024", es: "continuar", en: "carry on", level: "B1", topic: "phrasal-verbs" },
-  { id: "v-025", es: "averiguar", en: "find out", level: "B1", topic: "phrasal-verbs" },
-  { id: "v-026", es: "posponer", en: "put off", level: "B1", topic: "work" },
-  { id: "v-027", es: "rechazar", en: "turn down", level: "B2", topic: "work" },
-  { id: "v-028", es: "encargarse de", en: "deal with", level: "B1", topic: "work" },
-  { id: "v-029", es: "quedarse sin", en: "run out of", level: "B1", topic: "daily-life" },
-  { id: "v-030", es: "parecerse a", en: "take after", level: "B2", topic: "family" },
-  { id: "v-031", es: "asunto/tema", en: "issue", level: "B1", topic: "work" },
-  { id: "v-032", es: "ventaja", en: "advantage", level: "A2", topic: "general" },
-  { id: "v-033", es: "desventaja", en: "drawback", level: "B2", topic: "general" },
-  { id: "v-034", es: "metas", en: "goals", level: "B1", topic: "work" },
-  { id: "v-035", es: "actualmente", en: "currently", level: "B1", topic: "time" },
-];
+import { generateExercises } from "./exerciseGenerator";
 
-function generateFromVocab(vocab) {
-  return vocab.map((item) => ({
-    id: `gen-${item.id}`,
-    type: "vocab",
-    level: item.level,
-    topic: item.topic,
-    prompt: `Traduce: ${item.es}`,
-    answer: item.en,
-    note: "Generado desde vocabulario",
-  }));
+const EXERCISE_SEED_KEY = "exerciseSeed";
+
+function getSessionSeed() {
+  if (typeof window === "undefined") {
+    return Date.now();
+  }
+
+  try {
+    const stored = window.localStorage.getItem(EXERCISE_SEED_KEY);
+    if (stored) {
+      const parsed = Number(stored);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    const seed = Date.now();
+    window.localStorage.setItem(EXERCISE_SEED_KEY, String(seed));
+    return seed;
+  } catch (error) {
+    return Date.now();
+  }
 }
 
-const GENERATED_EXERCISES = generateFromVocab(VOCABULARY);
-
-const IRREGULAR_VERBS = [
-  { id: "ir-001", base: "go", past: "went", es: "ir", level: "A2" },
-  { id: "ir-002", base: "eat", past: "ate", es: "comer", level: "A2" },
-  { id: "ir-003", base: "see", past: "saw", es: "ver", level: "A2" },
-  { id: "ir-004", base: "take", past: "took", es: "tomar", level: "A2" },
-  { id: "ir-005", base: "come", past: "came", es: "venir", level: "A2" },
-  { id: "ir-006", base: "give", past: "gave", es: "dar", level: "B1" },
-  { id: "ir-007", base: "write", past: "wrote", es: "escribir", level: "B1" },
-  { id: "ir-008", base: "drive", past: "drove", es: "conducir", level: "B1" },
-  { id: "ir-009", base: "bring", past: "brought", es: "traer", level: "B1" },
-  { id: "ir-010", base: "buy", past: "bought", es: "comprar", level: "A2" },
-  { id: "ir-011", base: "catch", past: "caught", es: "atrapar/coger", level: "B1" },
-  { id: "ir-012", base: "choose", past: "chose", es: "elegir", level: "B1" },
-  { id: "ir-013", base: "fall", past: "fell", es: "caer", level: "A2" },
-  { id: "ir-014", base: "feel", past: "felt", es: "sentir", level: "A2" },
-  { id: "ir-015", base: "keep", past: "kept", es: "mantener", level: "B1" },
-  { id: "ir-016", base: "understand", past: "understood", es: "entender", level: "A2" },
-];
-
-function generateIrregularExercises(list) {
-  return list.map((verb) => ({
-    id: `gen-${verb.id}`,
-    type: "fill",
-    level: verb.level,
-    topic: "irregular-verbs",
-    prompt: `Past simple de "${verb.base}" (${verb.es}): ____`,
-    answer: [verb.past],
-    note: "Generado desde verbos irregulares",
-  }));
-}
-
-const IRREGULAR_EXERCISES = generateIrregularExercises(IRREGULAR_VERBS);
+const AUTO_GENERATED_EXERCISES = generateExercises({
+  count: 1000,
+  seed: getSessionSeed(),
+  includeBaseSets: true,
+  shuffle: true,
+});
 
 export const EXERCISES = [
   // Translation / phrases
@@ -905,8 +851,56 @@ export const EXERCISES = [
     answer: ["with"],
     note: "Be fed up with = Estar harto de algo."
   },
-  ...GENERATED_EXERCISES,
-  ...IRREGULAR_EXERCISES,
+    // Daily life A1-A2
+  { id: "ex-250", type: "translation", level: "A1", topic: "daily-life", prompt: "Tengo frio", answer: "I'm cold" },
+  { id: "ex-251", type: "translation", level: "A1", topic: "daily-life", prompt: "Tengo calor", answer: "I'm hot" },
+  { id: "ex-252", type: "translation", level: "A1", topic: "daily-life", prompt: "Estoy feliz", answer: "I'm happy" },
+  { id: "ex-253", type: "translation", level: "A2", topic: "daily-life", prompt: "Estoy preocupado", answer: "I'm worried" },
+  { id: "ex-254", type: "fill", level: "A2", topic: "daily-life", prompt: "She is ___ (feliz) today.", answer: ["happy"] },
+
+  // Travel
+  { id: "ex-260", type: "translation", level: "A2", topic: "travel", prompt: "Necesito un taxi", answer: "I need a taxi" },
+  { id: "ex-261", type: "fill", level: "A2", topic: "travel", prompt: "We are staying ___ a hotel.", answer: ["at"] },
+  { id: "ex-262", type: "translation", level: "B1", topic: "travel", prompt: "El tren se ha retrasado", answer: "The train has been delayed" },
+
+  // Work B1-B2
+  { id: "ex-270", type: "translation", level: "B1", topic: "work", prompt: "Debemos revisar el presupuesto", answer: "We need to review the budget" },
+  { id: "ex-271", type: "fill", level: "B2", topic: "work", prompt: "She is in charge ___ the new project.", answer: ["of"] },
+  { id: "ex-272", type: "translation", level: "B2", topic: "work", prompt: "Tenemos que posponer la reunión", answer: "We have to put off the meeting" },
+
+  // Food
+  { id: "ex-280", type: "translation", level: "A1", topic: "food", prompt: "Quiero agua", answer: "I want water" },
+  { id: "ex-281", type: "translation", level: "A2", topic: "food", prompt: "Me gustaría reservar una mesa", answer: "I'd like to book a table" },
+  { id: "ex-282", type: "fill", level: "A2", topic: "food", prompt: "Can I have some ___ (pan)?", answer: ["bread"] },
+
+  // Education
+  { id: "ex-290", type: "translation", level: "A1", topic: "education", prompt: "Estoy aprendiendo matemáticas", answer: "I'm learning math" },
+  { id: "ex-291", type: "fill", level: "A2", topic: "education", prompt: "He ___ (estudiar) English for two years.", answer: ["studied"] },
+
+  // Irregular verbs extra
+  { id: "ex-300", type: "fill", level: "B1", topic: "irregular-verbs", prompt: "She has ___ (escribir) a letter.", answer: ["written"] },
+  { id: "ex-301", type: "fill", level: "B1", topic: "irregular-verbs", prompt: "They ___ (traer) the books yesterday.", answer: ["brought"] },
+
+  // Phrasal verbs avanzados
+  { id: "ex-310", type: "fill", level: "B2", topic: "phrasal-verbs", prompt: "We need to ___ (examinar) the details carefully.", answer: ["look into"] },
+  { id: "ex-311", type: "translation", level: "B2", topic: "phrasal-verbs", prompt: "Me deshice de mis viejos libros", answer: "I got rid of my old books" },
+
+  // Conditionals
+  { id: "ex-320", type: "fill", level: "B2", topic: "conditionals", prompt: "If I ___ (tener) more time, I would travel.", answer: ["had"] },
+  { id: "ex-321", type: "translation", level: "B2", topic: "conditionals", prompt: "Si hubieras estudiado, habrías aprobado", answer: "If you had studied, you would have passed" },
+
+  // Idioms / common expressions
+  { id: "ex-330", type: "translation", level: "B2", topic: "idioms", prompt: "Estoy al borde del colapso", answer: "I'm at the end of my rope" },
+  { id: "ex-331", type: "phrase", level: "B1", topic: "idioms", prompt: "Me costó mucho trabajo", answer: "It took me a lot of effort" },
+
+  // Misc / connectors
+  { id: "ex-340", type: "fill", level: "B1", topic: "prepositions", prompt: "I am good ___ playing tennis.", answer: ["at"] },
+  { id: "ex-341", type: "fill", level: "B2", topic: "prepositions", prompt: "They are interested ___ learning new languages.", answer: ["in"] },
+
+  // Daily-life situational phrases
+  { id: "ex-350", type: "phrase", level: "B1", topic: "daily-life", prompt: "¿Qué tal tu día?", answer: "How was your day?" },
+  { id: "ex-351", type: "phrase", level: "B1", topic: "daily-life", prompt: "Cuídate mucho", answer: "Take care" },
+  ...AUTO_GENERATED_EXERCISES,
 ];
 
 export const EXERCISE_REMOTE_SHAPE = {
