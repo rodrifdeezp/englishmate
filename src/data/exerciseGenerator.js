@@ -21,6 +21,60 @@ function pick(random, list) {
   return list[Math.floor(random() * list.length)];
 }
 
+function pickByLevel(random, list, level) {
+  const filtered = list.filter((item) => item.level === level);
+  if (filtered.length === 0) return pick(random, list);
+  return pick(random, filtered);
+}
+
+function pickByTopic(random, list, topic) {
+  const filtered = list.filter((item) => item.topic === topic);
+  if (filtered.length === 0) return pick(random, list);
+  return pick(random, filtered);
+}
+
+function pickByLevelAndTopic(random, list, level, topic) {
+  const filtered = list.filter(
+    (item) => item.level === level && item.topic === topic
+  );
+  if (filtered.length > 0) return pick(random, filtered);
+  return pickByLevel(random, list, level);
+}
+
+function blankLastWord(sentence) {
+  if (!sentence) return null;
+  const trimmed = sentence.trim();
+  if (!trimmed) return null;
+  const words = trimmed.split(/\s+/);
+  if (words.length < 2) return null;
+  let last = words.pop();
+  let punctuation = "";
+  const match = last.match(/([.!?]+)$/);
+  if (match) {
+    punctuation = match[1];
+    last = last.slice(0, -punctuation.length);
+  }
+  if (!last) return null;
+  return {
+    text: `${words.join(" ")} ____${punctuation}`,
+    answer: last,
+  };
+}
+
+function blankFirstWord(phrase) {
+  if (!phrase) return null;
+  const trimmed = phrase.trim();
+  if (!trimmed) return null;
+  const words = trimmed.split(/\s+/);
+  if (words.length < 2) return null;
+  const first = words.shift();
+  if (!first) return null;
+  return {
+    text: `____ ${words.join(" ")}`,
+    answer: first,
+  };
+}
+
 function makeIdFactory(prefix) {
   let i = 1;
   return () => `${prefix}-${String(i++).padStart(4, "0")}`;
@@ -130,6 +184,22 @@ function usefulPhraseExercises(list, nextId) {
 }
 
 function randomFillExercises({ count, nextId, random }) {
+  const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
+  const TOPICS = [
+    "daily-life",
+    "travel",
+    "work",
+    "food",
+    "shopping",
+    "health",
+    "education",
+    "technology",
+    "ai",
+    "prepositions",
+    "phrasal-verbs",
+    "collocations",
+    "irregular-verbs",
+  ];
   const templates = [
     {
       type: "translation",
@@ -209,6 +279,34 @@ function randomFillExercises({ count, nextId, random }) {
     {
       type: "fill",
       make: () => {
+        const item = pick(random, USEFUL_PHRASES);
+        const blanked = blankLastWord(item.en);
+        if (!blanked) {
+          return {
+            id: nextId(),
+            type: "phrase",
+            level: item.level,
+            topic: item.topic,
+            prompt: item.es,
+            answer: item.en,
+            note: "Generado desde frases utiles",
+          };
+        }
+        return {
+          id: nextId(),
+          type: "fill",
+          level: item.level,
+          topic: item.topic,
+          prompt: `Completa (${item.es}): ${blanked.text}`,
+          answer: [blanked.answer],
+          hint: item.es,
+          note: "Generado desde frases utiles",
+        };
+      },
+    },
+    {
+      type: "fill",
+      make: () => {
         const item = pick(random, IRREGULAR_VERBS);
         const usePast = random() > 0.5;
         return {
@@ -221,6 +319,188 @@ function randomFillExercises({ count, nextId, random }) {
           }" (${item.es}): ____`,
           answer: [usePast ? item.past : item.pastParticiple],
           note: "Generado desde verbos irregulares",
+        };
+      },
+    },
+    {
+      type: "fill",
+      make: () => {
+        const item = pick(random, IRREGULAR_VERBS);
+        return {
+          id: nextId(),
+          type: "fill",
+          level: item.level,
+          topic: "irregular-verbs",
+          prompt: `Yesterday I ____ (${item.es}).`,
+          answer: [item.past],
+          note: "Generado desde verbos irregulares",
+        };
+      },
+    },
+    {
+      type: "fill",
+      make: () => {
+        const item = pick(random, COLLOCATIONS);
+        const blanked = blankFirstWord(item.en);
+        if (!blanked) {
+          return {
+            id: nextId(),
+            type: "translation",
+            level: item.level,
+            topic: "collocations",
+            prompt: `Traduce: ${item.es}`,
+            answer: item.en,
+            note: "Generado desde collocations",
+          };
+        }
+        return {
+          id: nextId(),
+          type: "fill",
+          level: item.level,
+          topic: "collocations",
+          prompt: `Completa: ${blanked.text}`,
+          answer: [blanked.answer],
+          note: "Generado desde collocations",
+        };
+      },
+    },
+    {
+      type: "fill",
+      make: () => {
+        const item = pick(random, VOCABULARY);
+        return {
+          id: nextId(),
+          type: "fill",
+          level: item.level,
+          topic: item.topic,
+          prompt: `Completa: The word for "${item.es}" is ____.`,
+          answer: [item.en],
+          note: "Generado desde vocabulario",
+        };
+      },
+    },
+    {
+      type: "fill",
+      make: () => {
+        const item = pick(random, PHRASAL_VERBS);
+        return {
+          id: nextId(),
+          type: "fill",
+          level: item.level,
+          topic: "phrasal-verbs",
+          prompt: `Completa: Please ____ (${item.es}).`,
+          answer: [item.en],
+          note: "Generado desde phrasal verbs",
+        };
+      },
+    },
+    {
+      type: "translation",
+      make: () => {
+        const level = pick(random, LEVELS);
+        const item = pickByLevel(random, USEFUL_PHRASES, level);
+        return {
+          id: nextId(),
+          type: "translation",
+          level: item.level,
+          topic: item.topic,
+          prompt: `Traduce: ${item.es}`,
+          answer: item.en,
+          note: "Generado por nivel desde frases utiles",
+        };
+      },
+    },
+    {
+      type: "fill",
+      make: () => {
+        const level = pick(random, LEVELS);
+        const item = pickByLevel(random, PREPOSITIONS, level);
+        return {
+          id: nextId(),
+          type: "fill",
+          level: item.level,
+          topic: "prepositions",
+          prompt: item.template,
+          answer: [item.en],
+          note: "Generado por nivel desde preposiciones",
+        };
+      },
+    },
+    {
+      type: "translation",
+      make: () => {
+        const topic = pick(random, TOPICS);
+        const item = pickByTopic(random, VOCABULARY, topic);
+        return {
+          id: nextId(),
+          type: "translation",
+          level: item.level,
+          topic: item.topic,
+          prompt: `Traduce: ${item.es}`,
+          answer: item.en,
+          note: "Generado por tema desde vocabulario",
+        };
+      },
+    },
+    {
+      type: "fill",
+      make: () => {
+        const topic = pick(random, TOPICS);
+        const item = pickByTopic(random, USEFUL_PHRASES, topic);
+        const blanked = blankLastWord(item.en);
+        if (!blanked) {
+          return {
+            id: nextId(),
+            type: "phrase",
+            level: item.level,
+            topic: item.topic,
+            prompt: item.es,
+            answer: item.en,
+            note: "Generado por tema desde frases utiles",
+          };
+        }
+        return {
+          id: nextId(),
+          type: "fill",
+          level: item.level,
+          topic: item.topic,
+          prompt: `Completa: ${blanked.text}`,
+          answer: [blanked.answer],
+          note: "Generado por tema desde frases utiles",
+        };
+      },
+    },
+    {
+      type: "fill",
+      make: () => {
+        const level = pick(random, LEVELS);
+        const topic = pick(random, TOPICS);
+        const item = pickByLevelAndTopic(random, VOCABULARY, level, topic);
+        return {
+          id: nextId(),
+          type: "fill",
+          level: item.level,
+          topic: item.topic,
+          prompt: `Completa: The word for "${item.es}" is ____.`,
+          answer: [item.en],
+          note: "Generado por nivel y tema desde vocabulario",
+        };
+      },
+    },
+    {
+      type: "translation",
+      make: () => {
+        const level = pick(random, LEVELS);
+        const topic = pick(random, TOPICS);
+        const item = pickByLevelAndTopic(random, USEFUL_PHRASES, level, topic);
+        return {
+          id: nextId(),
+          type: "translation",
+          level: item.level,
+          topic: item.topic,
+          prompt: `Traduce: ${item.es}`,
+          answer: item.en,
+          note: "Generado por nivel y tema desde frases utiles",
         };
       },
     },

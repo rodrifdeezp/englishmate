@@ -9,11 +9,12 @@ import { todayKey, yesterdayKey, isSameDay } from "./utils/time.js";
 // - Only introduce new exercises when previous ones are mastered.
 // - Mastery level moves up/down with answers (spaced repetition, simple version).
 
-const DAILY_LIMIT = 12; // around 10 minutes
+const DAILY_LIMIT = 10; // default daily goal
+const DAILY_GOAL_OPTIONS = [5, 10, 15];
 const REMOTE_EXERCISES_URL = ""; // Example: "https://raw.githubusercontent.com/user/repo/main/exercises.json"
 const UI_PREFS_KEY = "daily_english_ui_prefs_v1";
 const SERIES_LENGTH = 10;
-const QUICK_REVIEW_LIMIT = 3;
+const CHALLENGE_REWARD = 0.2;
 const WEEK_GOAL = 4;
 const SWIPE_THRESHOLD = 60;
 
@@ -50,20 +51,44 @@ const LEVEL_RANK = {
 
 const TOPIC_TIPS = {
   prepositions:
-    "Tip: usa at para lugares puntuales, in para ciudades/paises, on para superficies.",
+    "Tip: at para puntos concretos (hora/lugar exacto), in para espacios cerrados/ciudades/paises/meses, on para superficies/dias. Ojo con in the morning/at night/on Monday.",
   "phrasal-verbs":
-    "Tip: los phrasal verbs cambian el significado del verbo base.",
+    "Tip: un phrasal verb puede ser separable o no. Si es separable, el pronombre va en medio (turn it off). Aprende el significado como unidad.",
   "modal-verbs":
-    "Tip: los modales van antes del verbo principal (no llevan 'to').",
+    "Tip: los modales van antes del verbo base (sin 'to') y no cambian con he/she/it. Usa could para cortesía, must para obligacion, might/may para posibilidad.",
   conditionals:
-    "Tip: if + presente, will + verbo para futuro simple.",
+    "Tip: 0/1 condicional usan presente en if. Para hipoteticos: if + past, would + verbo. Para pasado irreal: if + past perfect, would have + participio.",
   collocations:
-    "Tip: ciertas palabras van juntas en ingles (make a decision, do homework).",
+    "Tip: algunas combinaciones son fijas: make a decision, do homework, take a break. No traduzcas palabra por palabra; memoriza la pareja.",
   technology:
-    "Tip: en temas tech, prioriza verbos de accion y sustantivos precisos (latency, throughput, rollback).",
+    "Tip: en tech usa verbos concretos (deploy, crash, fix) y sustantivos precisos (latency, outage, backlog). Evita vaguedad: se specifico.",
   ai:
-    "Tip: en IA, usa vocabulario general como model, data, bias y accuracy.",
+    "Tip: en IA habla de datos, sesgo, precision/recall y generalizacion. Diferencia modelo, entrenamiento e inferencia.",
+  "daily-life":
+    "Tip: usa presente simple para rutinas (I work) y presente continuo para acciones de ahora (I'm working). Con estados usa be (I'm tired/hungry).",
+  future:
+    "Tip: will para decisiones espontaneas/promesas, be going to para planes/intencion, present continuous para planes ya acordados (I'm meeting).",
+  idioms:
+    "Tip: no se traducen literal. Busca el equivalente en ingles y mantenlos en frases naturales; suelen ir en registro informal.",
+  "irregular-verbs":
+    "Tip: memoriza base/past/participle en bloques (go/went/gone). En preguntas/negaciones usa did + base (no *did went*).",
+  "past-simple":
+    "Tip: usa pasado simple para acciones terminadas con tiempo definido. Regulares terminan en -ed; irregulares cambian forma. En preguntas usa did + base.",
+  "present-perfect":
+    "Tip: usa present perfect para experiencias o acciones con impacto ahora (I have lost...). Con for/since indica duracion.",
+  superlatives:
+    "Tip: el superlativo lleva the: the biggest/the most interesting. Adjetivos cortos: -est; largos: most + adj. Ojo con good -> best.",
+  travel:
+    "Tip: prioriza expresiones de ubicacion, transporte y peticiones corteses (Could I...?). Usa where/how much/which para preguntas frecuentes.",
+  work:
+    "Tip: usa verbos de accion (send, review, fix) y marcadores de tiempo (by EOD, tomorrow). Mantiene tono profesional y directo.",
 };
+
+function getDailyMasteryCap(dailyGoal) {
+  if (dailyGoal === 5) return 0.5;
+  if (dailyGoal === 10) return 0.75;
+  return 1;
+}
 
 function defaultProgress() {
   return {
@@ -280,11 +305,13 @@ function buildDailyQueue(
 }
 
 function pickDailyChallenge(exercises, levelCap) {
-  const pool = levelCap
-    ? exercises.filter((ex) => (LEVEL_RANK[ex.level] || 1) <= levelCap)
-    : exercises;
-  if (pool.length === 0) return null;
-  const seedKey = `challenge|${todayKey()}`;
+  if (!levelCap) return null;
+  const nextLevel = LEVELS[levelCap] || null;
+  if (!nextLevel) return null;
+  const byLevel = exercises.filter((ex) => ex.level === nextLevel);
+  if (byLevel.length === 0) return null;
+  const seedKey = `challenge|${todayKey()}|${nextLevel}`;
+  const pool = byLevel;
   const shuffled = shuffleWithSeed(pool, seedKey);
   return shuffled[0];
 }
@@ -342,11 +369,32 @@ export default function App() {
       return 1;
     }
   });
+  const [dailyGoal, setDailyGoal] = useState(() => {
+    try {
+      const raw = localStorage.getItem(UI_PREFS_KEY);
+      if (!raw) return DAILY_LIMIT;
+      const parsed = JSON.parse(raw);
+      return Number(parsed?.dailyGoal) || DAILY_LIMIT;
+    } catch {
+      return DAILY_LIMIT;
+    }
+  });
   const [confidence, setConfidence] = useState(2);
   const [state, setState] = useState(() => {
     const today = todayKey();
     if (saved && saved.session && isSameDay(saved.lastSessionDate, today)) {
-      return saved;
+      return {
+        ...saved,
+        dailyChallenge:
+          saved?.dailyChallenge?.date === today
+            ? saved.dailyChallenge
+            : { date: today, completed: false },
+        session: {
+          ...saved.session,
+          answeredIds: saved.session?.answeredIds || [],
+          correctIds: saved.session?.correctIds || [],
+        },
+      };
     }
 
     // New day: build a fresh queue.
@@ -355,7 +403,8 @@ export default function App() {
       EXERCISES,
       progressById,
       moduleId,
-      levelCap
+      levelCap,
+      dailyGoal
     );
     const streakDays = computeStreakDays(saved?.activityDays || [], today);
 
@@ -364,19 +413,25 @@ export default function App() {
       lastSessionDate: today,
       streakDays,
       activityDays: saved?.activityDays || [],
+      dailyChallenge: { date: today, completed: false },
       session: {
         date: today,
         queueIds: queue.map((ex) => ex.id),
         index: 0,
         completed: 0,
+        answeredIds: [],
+        correctIds: [],
         moduleId,
         levelCap,
+        dailyGoal,
       },
     };
   });
 
   const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState(null);
+  const [challengeAnswer, setChallengeAnswer] = useState("");
+  const [challengeFeedback, setChallengeFeedback] = useState(null);
   const [isLoadingQueue, setIsLoadingQueue] = useState(false);
 
   useEffect(() => {
@@ -400,14 +455,16 @@ export default function App() {
       moduleId,
       levelCap,
       speechRate,
+      dailyGoal,
     };
     localStorage.setItem(UI_PREFS_KEY, JSON.stringify(nextPrefs));
-  }, [focusMode, highContrast, moduleId, levelCap, speechRate]);
+  }, [focusMode, highContrast, moduleId, levelCap, speechRate, dailyGoal]);
 
   useEffect(() => {
     const sessionMatchesFilters =
       state.session?.moduleId === moduleId &&
       state.session?.levelCap === levelCap &&
+      state.session?.dailyGoal === dailyGoal &&
       isSameDay(state.session?.date, todayKey());
 
     if (sessionMatchesFilters) return undefined;
@@ -421,7 +478,8 @@ export default function App() {
         exercises,
         state.progressById,
         moduleId,
-        levelCap
+        levelCap,
+        dailyGoal
       );
       const nextState = {
         ...state,
@@ -431,8 +489,11 @@ export default function App() {
           queueIds: queue.map((ex) => ex.id),
           index: 0,
           completed: 0,
+          answeredIds: [],
+          correctIds: [],
           moduleId,
           levelCap,
+          dailyGoal,
         },
       };
       persist(nextState);
@@ -440,7 +501,7 @@ export default function App() {
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [moduleId, exercises, levelCap]);
+  }, [moduleId, exercises, levelCap, dailyGoal]);
 
   function resetUIPreferences() {
     setFocusMode(false);
@@ -448,6 +509,7 @@ export default function App() {
     setModuleId("all");
     setLevelCap(LEVEL_RANK.A1);
     setSpeechRate(1);
+    setDailyGoal(DAILY_LIMIT);
     localStorage.removeItem(UI_PREFS_KEY);
   }
 
@@ -458,23 +520,35 @@ export default function App() {
     if (!confirmed) return;
     clearState();
     const progressById = {};
-    const queue = buildDailyQueue(exercises, progressById, moduleId, levelCap);
+    const queue = buildDailyQueue(
+      exercises,
+      progressById,
+      moduleId,
+      levelCap,
+      dailyGoal
+    );
     const nextState = {
       progressById,
       lastSessionDate: todayKey(),
       streakDays: 0,
       activityDays: [],
+      dailyChallenge: { date: todayKey(), completed: false },
       session: {
         date: todayKey(),
         queueIds: queue.map((ex) => ex.id),
         index: 0,
         completed: 0,
+        answeredIds: [],
+        correctIds: [],
         moduleId,
         levelCap,
+        dailyGoal,
       },
     };
     setAnswer("");
     setFeedback(null);
+    setChallengeAnswer("");
+    setChallengeFeedback(null);
     persist(nextState);
   }
 
@@ -483,6 +557,9 @@ export default function App() {
     .filter(Boolean);
   const current = queue[state.session.index];
   const dailyChallenge = pickDailyChallenge(exercises, levelCap);
+  const isChallengeDoneToday =
+    state.dailyChallenge?.date === todayKey() &&
+    state.dailyChallenge?.completed;
   const touchStart = useRef({ x: 0, y: 0 });
 
   function persist(next) {
@@ -497,8 +574,9 @@ export default function App() {
     nextProgress.lastConfidence = confidenceLevel ?? null;
 
     if (isCorrect) {
+      const masteryCap = getDailyMasteryCap(dailyGoal);
       nextProgress.masteryLevel = Math.min(
-        1,
+        masteryCap,
         nextProgress.masteryLevel + 0.4
       );
     } else {
@@ -525,26 +603,26 @@ export default function App() {
       ...state.progressById,
       [current.id]: updateProgress(current, isCorrect, confidence),
     };
-
+    const nextCorrectIds = new Set(state.session.correctIds || []);
+    const nextAnsweredIds = new Set(state.session.answeredIds || []);
+    if (isCorrect) {
+      nextCorrectIds.add(current.id);
+    } else {
+      nextCorrectIds.delete(current.id);
+    }
+    nextAnsweredIds.add(current.id);
     const nextSession = {
       ...state.session,
-      completed: Math.min(state.session.completed + 1, queue.length),
+      answeredIds: Array.from(nextAnsweredIds),
+      correctIds: Array.from(nextCorrectIds),
     };
-
-    const isSessionComplete = nextSession.completed >= queue.length && queue.length > 0;
-    const nextActivityDays = isSessionComplete
-      ? markActivityDay(state.activityDays || [], todayKey())
-      : state.activityDays || [];
-    const nextStreakDays = isSessionComplete
-      ? computeStreakDays(nextActivityDays, todayKey())
-      : state.streakDays || 0;
 
     const nextState = {
       ...state,
       progressById: nextProgress,
       lastSessionDate: todayKey(),
-      activityDays: nextActivityDays,
-      streakDays: nextStreakDays,
+      activityDays: state.activityDays || [],
+      streakDays: state.streakDays || 0,
       session: nextSession,
     };
 
@@ -572,32 +650,130 @@ export default function App() {
     });
   }
 
+  function handleChallengeAnswer() {
+    if (!dailyChallenge || isChallengeDoneToday) return;
+    const isCorrect = checkAnswer(
+      challengeAnswer,
+      dailyChallenge.answer,
+      dailyChallenge.synonyms
+    );
+    const currentProgress =
+      state.progressById[dailyChallenge.id] || defaultProgress();
+    const masteryCap = getDailyMasteryCap(dailyGoal);
+    const nextProgress = {
+      ...currentProgress,
+      attempts: currentProgress.attempts + 1,
+      masteryLevel: Math.min(
+        masteryCap,
+        currentProgress.masteryLevel + CHALLENGE_REWARD
+      ),
+    };
+    const nextState = {
+      ...state,
+      progressById: isCorrect
+        ? {
+            ...state.progressById,
+            [dailyChallenge.id]: nextProgress,
+          }
+        : state.progressById,
+      dailyChallenge: { date: todayKey(), completed: true },
+    };
+    persist(nextState);
+    setChallengeFeedback({
+      ok: isCorrect,
+      message: isCorrect
+        ? `Correcto. +${Math.round(CHALLENGE_REWARD * 100)}% de dominio.`
+        : "Respuesta incorrecta. El reto se marca como completado.",
+    });
+    setChallengeAnswer("");
+  }
+
   function nextExercise() {
     if (!current) return;
     setFeedback(null);
     setAnswer("");
 
+    const nextAnsweredIds = new Set(state.session.answeredIds || []);
+    nextAnsweredIds.add(current.id);
     const nextSession = {
       ...state.session,
+      completed: Math.min(state.session.completed + 1, queue.length),
       index: Math.min(state.session.index + 1, queue.length),
+      answeredIds: Array.from(nextAnsweredIds),
     };
+
+    const isSessionComplete =
+      nextSession.completed >= queue.length && queue.length > 0;
+    const nextActivityDays = isSessionComplete
+      ? markActivityDay(state.activityDays || [], todayKey())
+      : state.activityDays || [];
+    const nextStreakDays = isSessionComplete
+      ? computeStreakDays(nextActivityDays, todayKey())
+      : state.streakDays || 0;
 
     persist({
       ...state,
+      activityDays: nextActivityDays,
+      streakDays: nextStreakDays,
       session: nextSession,
     });
+  }
+
+  function confirmSessionReset(nextModuleId, nextLevelCap, nextDailyGoal) {
+    const sessionDate = state.session?.date;
+    const isToday = sessionDate && isSameDay(sessionDate, todayKey());
+    const willChangeModule =
+      typeof nextModuleId === "string" &&
+      nextModuleId !== state.session?.moduleId;
+    const willChangeLevel =
+      typeof nextLevelCap === "number" &&
+      nextLevelCap !== state.session?.levelCap;
+    const willChangeDailyGoal =
+      typeof nextDailyGoal === "number" &&
+      nextDailyGoal !== state.session?.dailyGoal;
+    const hasProgress =
+      (state.session?.completed || 0) > 0 || (state.session?.index || 0) > 0;
+
+    if (
+      isToday &&
+      hasProgress &&
+      (willChangeModule || willChangeLevel || willChangeDailyGoal)
+    ) {
+      return window.confirm(
+        "Si cambias el nivel, el modulo o la meta diaria se reiniciara la sesion de hoy. Quieres continuar?"
+      );
+    }
+    return true;
   }
 
   const remainingToday = Math.max(queue.length - state.session.completed, 0);
   const displayStreakDays = computeStreakDays(state.activityDays || [], todayKey());
   const currentStreakTier = streakTier(displayStreakDays);
-  const masteryPercent = Math.round(
-    (queue.reduce(
-      (sum, ex) => sum + (state.progressById[ex.id]?.masteryLevel || 0),
-      0
-    ) /
-      Math.max(queue.length, 1)) *
-      100
+  const correctCount = Math.min(
+    state.session.correctIds?.length || 0,
+    dailyGoal
+  );
+  const answeredCount = Math.min(
+    state.session.answeredIds?.length || 0,
+    dailyGoal
+  );
+  const remainingCount = Math.max(dailyGoal - answeredCount, 0);
+  const capPercent = Math.round(getDailyMasteryCap(dailyGoal) * 100);
+  const challengeBonusPercent =
+    dailyChallenge && !isChallengeDoneToday
+      ? Math.round(
+          (capPercent / Math.max(dailyGoal, 1)) * (CHALLENGE_REWARD / 0.4)
+        )
+      : 0;
+  const progressPercent = Math.round(
+    (correctCount / Math.max(dailyGoal, 1)) * capPercent
+  );
+  const potentialPercent = Math.round(
+    ((correctCount + remainingCount) / Math.max(dailyGoal, 1)) * capPercent
+  );
+  const bonusProjectionPercent = Math.min(
+    100,
+    progressPercent + challengeBonusPercent
   );
   const failedYesterdayIds = exercises
     .filter((ex) => state.progressById[ex.id]?.lastFailedAt === yesterdayKey())
@@ -767,19 +943,35 @@ export default function App() {
                   className={`rounded-2xl border px-3 py-2 text-sm shadow-sm ${surfaceClass}`}
                 >
                   <p className="text-xs uppercase tracking-wide opacity-70">
-                    Dominio hoy
+                    Progreso hoy
                   </p>
                   <div className="flex items-center gap-2">
-                    <div className="h-2 w-full rounded-full bg-slate-200/60">
+                    <div className="relative h-2 w-full rounded-full bg-slate-200/60">
                       <div
-                        className={`h-2 rounded-full ${
+                        className={`absolute inset-y-0 left-0 rounded-full ${
+                          highContrast ? "bg-emerald-200/40" : "bg-emerald-300/50"
+                        }`}
+                        style={{ width: `${potentialPercent}%` }}
+                      />
+                      {challengeBonusPercent > 0 && (
+                        <div
+                          className={`absolute inset-y-0 left-0 rounded-full ${
+                            highContrast
+                              ? "bg-amber-300/40"
+                              : "bg-amber-400/50"
+                          }`}
+                          style={{ width: `${bonusProjectionPercent}%` }}
+                        />
+                      )}
+                      <div
+                        className={`absolute inset-y-0 left-0 rounded-full ${
                           highContrast ? "bg-emerald-400" : "bg-emerald-600"
                         }`}
-                        style={{ width: `${masteryPercent}%` }}
+                        style={{ width: `${progressPercent}%` }}
                       />
                     </div>
                     <span className="text-xs font-semibold">
-                      {masteryPercent}%
+                      {progressPercent}%
                     </span>
                   </div>
                   <div className="mt-2">
@@ -812,7 +1004,11 @@ export default function App() {
                         : "border-slate-200 bg-white text-slate-700"
                     }`}
                     value={moduleId}
-                    onChange={(e) => setModuleId(e.target.value)}
+                    onChange={(e) => {
+                      const nextValue = e.target.value;
+                      if (!confirmSessionReset(nextValue, levelCap, dailyGoal)) return;
+                      setModuleId(nextValue);
+                    }}
                   >
                     {MODULES.map((module) => (
                       <option key={module.id} value={module.id}>
@@ -830,11 +1026,39 @@ export default function App() {
                         : "border-slate-200 bg-white text-slate-700"
                     }`}
                     value={levelCap}
-                    onChange={(e) => setLevelCap(Number(e.target.value))}
+                    onChange={(e) => {
+                      const nextValue = Number(e.target.value);
+                      if (!confirmSessionReset(moduleId, nextValue, dailyGoal))
+                        return;
+                      setLevelCap(nextValue);
+                    }}
                   >
                     {LEVELS.map((level) => (
                       <option key={level} value={LEVEL_RANK[level]}>
                         Hasta {level}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2">
+                  <span className={subtleText}>Meta diaria</span>
+                  <select
+                    className={`rounded-full border px-2 py-1 text-xs ${
+                      highContrast
+                        ? "border-slate-700 bg-slate-900 text-slate-200"
+                        : "border-slate-200 bg-white text-slate-700"
+                    }`}
+                    value={dailyGoal}
+                    onChange={(e) => {
+                      const nextValue = Number(e.target.value);
+                      if (!confirmSessionReset(moduleId, levelCap, nextValue))
+                        return;
+                      setDailyGoal(nextValue);
+                    }}
+                  >
+                    {DAILY_GOAL_OPTIONS.map((goal) => (
+                      <option key={goal} value={goal}>
+                        {goal}
                       </option>
                     ))}
                   </select>
@@ -851,69 +1075,10 @@ export default function App() {
                 >
                   Audio: {speechRate === 1 ? "Normal" : "Lento"}
                 </button>
-                <button
-                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                    highContrast
-                      ? "border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500"
-                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                  }`}
-                  onClick={() => {
-                    const quickQueue = buildDailyQueue(
-                      exercises,
-                      state.progressById,
-                      moduleId,
-                      levelCap,
-                      QUICK_REVIEW_LIMIT
-                    );
-                    setAnswer("");
-                    setFeedback(null);
-                    persist({
-                      ...state,
-                      session: {
-                        date: todayKey(),
-                        queueIds: quickQueue.map((ex) => ex.id),
-                        index: 0,
-                        completed: 0,
-                      },
-                    });
-                  }}
-                >
-                  Repaso rapido
-                </button>
-                {dailyChallenge && (
-                  <button
-                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                      highContrast
-                        ? "border-amber-500/60 bg-amber-900/40 text-amber-200 hover:border-amber-300"
-                        : "border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300"
-                    }`}
-                    onClick={() => {
-                      const ids = state.session.queueIds.filter(
-                        (id) => id !== dailyChallenge.id
-                      );
-                      persist({
-                        ...state,
-                        session: {
-                          ...state.session,
-                          queueIds: [dailyChallenge.id, ...ids],
-                          index: 0,
-                          completed: 0,
-                        },
-                      });
-                    }}
-                  >
-                    Reto del dia
-                  </button>
-                )}
                 <span className={subtleText}>
                   Serie: {selectedModule.label}
                 </span>
               </div>
-              {dailyChallenge && (
-                <p className={`pt-2 text-xs ${subtleText}`}>
-                  Reto del dia: {dailyChallenge.prompt}
-                </p>
-              )}
             </>
           )}
         </header>
@@ -995,7 +1160,9 @@ export default function App() {
                 </div>
               )}
               <p className="text-lg font-medium">{current.prompt}</p>
-              {!focusMode && TOPIC_TIPS[current.topic] && (
+              {!focusMode &&
+                levelCap <= LEVEL_RANK.A2 &&
+                TOPIC_TIPS[current.topic] && (
                 <p className={`text-xs ${subtleText}`}>
                   {TOPIC_TIPS[current.topic]}
                 </p>
@@ -1026,7 +1193,7 @@ export default function App() {
                 ))}
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex flex-col gap-2">
                 <input
                   className={`w-full rounded-xl border px-3 py-2 text-sm shadow-sm outline-none transition focus:ring-2 ${
                     highContrast
@@ -1047,6 +1214,9 @@ export default function App() {
                   }}
                   placeholder="Escribe la respuesta en ingles"
                 />
+              </div>
+
+              <div className="flex flex-wrap gap-2">
                 <button
                   className={`rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition ${
                     highContrast
@@ -1057,14 +1227,11 @@ export default function App() {
                 >
                   Responder
                 </button>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
                 <button
                   className={`rounded-xl border px-3 py-2 text-sm shadow-sm transition ${
                     highContrast
                       ? "border-slate-700 bg-slate-900/60 text-slate-200 hover:border-slate-500"
-                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
                   }`}
                   onClick={() => handleAnswer(true)}
                 >
@@ -1126,6 +1293,70 @@ export default function App() {
             </div>
           )}
         </section>
+
+        {dailyChallenge && (
+          <section
+            className={`rounded-2xl border p-4 shadow-sm backdrop-blur sm:p-5 ${surfaceClass}`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-base font-semibold">
+                Reto del dia (nivel {dailyChallenge.level})
+              </h3>
+              <span className={`text-xs ${subtleText}`}>
+                No cuenta en los {dailyGoal} de hoy pero puede darte hasta +{challengeBonusPercent}% de dominio en esa frase.
+              </span>
+            </div>
+            <p className="mt-2 text-sm">{dailyChallenge.prompt}</p>
+            {dailyChallenge.hint && (
+              <p className={`mt-1 text-xs ${subtleText}`}>
+                Pista: {dailyChallenge.hint}
+              </p>
+            )}
+            {isChallengeDoneToday ? (
+              <p className={`mt-2 text-xs ${subtleText}`}>
+                Reto completado hoy.
+              </p>
+            ) : (
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <input
+                  className={`w-full rounded-xl border px-3 py-2 text-sm shadow-sm outline-none transition focus:ring-2 ${
+                    highContrast
+                      ? "border-slate-600 bg-slate-800 text-slate-100 placeholder-slate-400 focus:border-slate-400 focus:ring-slate-600"
+                      : "border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:border-slate-400 focus:ring-slate-200"
+                  }`}
+                  value={challengeAnswer}
+                  onChange={(e) => setChallengeAnswer(e.target.value)}
+                  placeholder="Tu respuesta"
+                />
+                <button
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition ${
+                    highContrast
+                      ? "bg-amber-200 text-slate-900 hover:bg-amber-100"
+                      : "bg-amber-500 text-white hover:bg-amber-400"
+                  }`}
+                  onClick={handleChallengeAnswer}
+                >
+                  Resolver reto
+                </button>
+              </div>
+            )}
+            {challengeFeedback && (
+              <div
+                className={`mt-3 rounded-xl px-3 py-2 text-sm ${
+                  challengeFeedback.ok
+                    ? highContrast
+                      ? "bg-emerald-900/50 text-emerald-200"
+                      : "bg-emerald-50 text-emerald-700"
+                    : highContrast
+                      ? "bg-rose-900/50 text-rose-200"
+                      : "bg-rose-50 text-rose-700"
+                }`}
+              >
+                <p>{challengeFeedback.message}</p>
+              </div>
+            )}
+          </section>
+        )}
 
         {!focusMode && (
           <section
