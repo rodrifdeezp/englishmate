@@ -618,9 +618,9 @@ export default function App() {
           : "bg-gradient-to-br from-slate-50 via-white to-slate-100 text-slate-900"
       }`}
     >
-      <div className="mx-auto w-full max-w-2xl space-y-5 sm:space-y-6">
+      <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
         <header className="space-y-2">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div
               className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs uppercase tracking-wide ${
                 highContrast
@@ -630,9 +630,9 @@ export default function App() {
             >
               Daily practice
             </div>
-            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <div className="flex items-center gap-2">
               <button
-                className={`w-full rounded-full border px-3 py-1 text-xs font-semibold transition sm:w-auto ${
+                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                   highContrast
                     ? "border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500"
                     : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
@@ -642,7 +642,7 @@ export default function App() {
                 {focusMode ? "Salir focus" : "Modo focus"}
               </button>
               <button
-                className={`w-full rounded-full border px-3 py-1 text-xs font-semibold transition sm:w-auto ${
+                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                   highContrast
                     ? "border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500"
                     : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
@@ -652,7 +652,7 @@ export default function App() {
                 {highContrast ? "Tema claro" : "Alto contraste"}
               </button>
               <button
-                className={`w-full rounded-full border px-3 py-1 text-xs font-semibold transition sm:w-auto ${
+                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                   highContrast
                     ? "border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500"
                     : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
@@ -662,7 +662,7 @@ export default function App() {
                 Reset UI
               </button>
               <button
-                className={`w-full rounded-full border px-3 py-1 text-xs font-semibold transition sm:w-auto ${
+                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                   highContrast
                     ? "border-rose-700 bg-rose-900/50 text-rose-200 hover:border-rose-500"
                     : "border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-300"
@@ -750,10 +750,10 @@ export default function App() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-3 pt-2 text-xs">
-                <label className="flex w-full items-center gap-2 sm:w-auto">
+                <label className="flex items-center gap-2">
                   <span className={subtleText}>Modulo</span>
                   <select
-                    className={`w-full rounded-full border px-2 py-1 text-xs sm:w-auto ${
+                    className={`rounded-full border px-2 py-1 text-xs ${
                       highContrast
                         ? "border-slate-700 bg-slate-900 text-slate-200"
                         : "border-slate-200 bg-white text-slate-700"
@@ -768,10 +768,10 @@ export default function App() {
                     ))}
                   </select>
                 </label>
-                <label className="flex w-full items-center gap-2 sm:w-auto">
+                <label className="flex items-center gap-2">
                   <span className={subtleText}>Nivel</span>
                   <select
-                    className={`w-full rounded-full border px-2 py-1 text-xs sm:w-auto ${
+                    className={`rounded-full border px-2 py-1 text-xs ${
                       highContrast
                         ? "border-slate-700 bg-slate-900 text-slate-200"
                         : "border-slate-200 bg-white text-slate-700"
@@ -787,7 +787,7 @@ export default function App() {
                   </select>
                 </label>
                 <button
-                  className={`w-full rounded-full border px-3 py-1 text-xs font-semibold transition sm:w-auto ${
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                     highContrast
                       ? "border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500"
                       : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
@@ -799,7 +799,7 @@ export default function App() {
                   Audio: {speechRate === 1 ? "Normal" : "Lento"}
                 </button>
                 <button
-                  className={`w-full rounded-full border px-3 py-1 text-xs font-semibold transition sm:w-auto ${
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                     highContrast
                       ? "border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500"
                       : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
@@ -829,7 +829,7 @@ export default function App() {
                 </button>
                 {dailyChallenge && (
                   <button
-                    className={`w-full rounded-full border px-3 py-1 text-xs font-semibold transition sm:w-auto ${
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                       highContrast
                         ? "border-amber-500/60 bg-amber-900/40 text-amber-200 hover:border-amber-300"
                         : "border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300"
