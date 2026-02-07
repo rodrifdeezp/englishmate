@@ -892,9 +892,9 @@ export default function App() {
 
           {!focusMode && (
             <>
-              <h1 className="text-3xl font-semibold tracking-tight">
+              <h2 className="text-3xl font-semibold tracking-tight">
                 Daily English Learning
-              </h1>
+              </h2>
               <p className={`text-sm ${subtleText}`}>
                 Practica diaria de 5-10 minutos. Una frase a la vez.
               </p>
