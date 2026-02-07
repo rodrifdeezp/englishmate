@@ -170,6 +170,35 @@ function markActivityDay(activityDays, dateKey) {
   return [...activityDays, dateKey];
 }
 
+function previousDayKey(dateKey) {
+  if (!dateKey) return yesterdayKey();
+  const date = new Date(`${dateKey}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return yesterdayKey();
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function computeStreakDays(activityDays, today) {
+  const days = new Set(activityDays || []);
+  if (days.size === 0) return 0;
+  let cursor = days.has(today) ? today : yesterdayKey();
+  let streak = 0;
+  while (days.has(cursor)) {
+    streak += 1;
+    cursor = previousDayKey(cursor);
+  }
+  return streak;
+}
+
+function streakTier(streakDays) {
+  if (streakDays >= 30) return 5;
+  if (streakDays >= 14) return 4;
+  if (streakDays >= 7) return 3;
+  if (streakDays >= 3) return 2;
+  if (streakDays >= 1) return 1;
+  return 0;
+}
+
 function getExtraExample(exercises, current) {
   if (!current) return null;
   const candidate = exercises.find(
@@ -328,9 +357,7 @@ export default function App() {
       moduleId,
       levelCap
     );
-    const completedYesterday =
-      saved?.session?.completed > 0 && saved?.lastSessionDate === yesterdayKey();
-    const streakDays = completedYesterday ? (saved?.streakDays || 0) + 1 : 0;
+    const streakDays = computeStreakDays(saved?.activityDays || [], today);
 
     return {
       progressById,
@@ -508,12 +535,16 @@ export default function App() {
     const nextActivityDays = isSessionComplete
       ? markActivityDay(state.activityDays || [], todayKey())
       : state.activityDays || [];
+    const nextStreakDays = isSessionComplete
+      ? computeStreakDays(nextActivityDays, todayKey())
+      : state.streakDays || 0;
 
     const nextState = {
       ...state,
       progressById: nextProgress,
       lastSessionDate: todayKey(),
       activityDays: nextActivityDays,
+      streakDays: nextStreakDays,
       session: nextSession,
     };
 
@@ -558,6 +589,8 @@ export default function App() {
   }
 
   const remainingToday = Math.max(queue.length - state.session.completed, 0);
+  const displayStreakDays = computeStreakDays(state.activityDays || [], todayKey());
+  const currentStreakTier = streakTier(displayStreakDays);
   const masteryPercent = Math.round(
     (queue.reduce(
       (sum, ex) => sum + (state.progressById[ex.id]?.masteryLevel || 0),
@@ -696,9 +729,22 @@ export default function App() {
                   <p className="text-xs uppercase tracking-wide opacity-70">
                     Racha
                   </p>
-                  <p className="text-lg font-semibold">
-                    {state.streakDays || 0} dias
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-lg font-semibold">
+                      {displayStreakDays} dias
+                    </p>
+                    {currentStreakTier > 0 && (
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                          highContrast
+                            ? "bg-amber-900/60 text-amber-200"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        Fuego {currentStreakTier}
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-2 grid grid-cols-7 gap-1">
                     {getRecentDays(7).map((day) => (
                       <span
