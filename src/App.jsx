@@ -922,34 +922,19 @@ export default function App() {
           ) : (
             <div className="mt-4 space-y-4">
               {!focusMode && (
-                <div className={`flex flex-wrap gap-2 text-xs ${subtleText}`}>
-                  <span
-                    className={`rounded-full border bg-white/80 px-2 py-1 ${
-                      highContrast
-                        ? "border-slate-700 bg-slate-900/70"
-                        : borderMuted
-                    }`}
-                  >
-                    {current.type}
-                  </span>
-                  <span
-                    className={`rounded-full border bg-white/80 px-2 py-1 ${
-                      highContrast
-                        ? "border-slate-700 bg-slate-900/70"
-                        : borderMuted
-                    }`}
-                  >
-                    {current.level}
-                  </span>
-                  <span
-                    className={`rounded-full border bg-white/80 px-2 py-1 ${
-                      highContrast
-                        ? "border-slate-700 bg-slate-900/70"
-                        : borderMuted
-                    }`}
-                  >
-                    {current.topic}
-                  </span>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {["type", "level", "topic"].map((key) => (
+                    <span
+                      key={key}
+                      className={`rounded-full border px-2 py-1 ${
+                        highContrast
+                          ? "border-slate-600 bg-slate-800 text-slate-100"
+                          : "border-slate-200 bg-white text-slate-700"
+                      }`}
+                    >
+                      {current[key]}
+                    </span>
+                  ))}
                 </div>
               )}
               <p className="text-lg font-medium">{current.prompt}</p>
