@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EXERCISES } from "./data/exercises.js";
-import { loadState, saveState } from "./utils/storage.js";
+import { loadState, saveState, clearState } from "./utils/storage.js";
 import { checkAnswer } from "./utils/checker.js";
 import { todayKey, yesterdayKey, isSameDay } from "./utils/time.js";
 
@@ -417,6 +417,33 @@ export default function App() {
     localStorage.removeItem(UI_PREFS_KEY);
   }
 
+  function resetProgress() {
+    const confirmed = window.confirm(
+      "Esto borrara tu progreso y no se puede deshacer. Quieres continuar?"
+    );
+    if (!confirmed) return;
+    clearState();
+    const progressById = {};
+    const queue = buildDailyQueue(exercises, progressById, moduleId, levelCap);
+    const nextState = {
+      progressById,
+      lastSessionDate: todayKey(),
+      streakDays: 0,
+      activityDays: [],
+      session: {
+        date: todayKey(),
+        queueIds: queue.map((ex) => ex.id),
+        index: 0,
+        completed: 0,
+        moduleId,
+        levelCap,
+      },
+    };
+    setAnswer("");
+    setFeedback(null);
+    persist(nextState);
+  }
+
   const queue = state.session.queueIds
     .map((id) => exercises.find((ex) => ex.id === id))
     .filter(Boolean);
@@ -633,6 +660,16 @@ export default function App() {
                 onClick={resetUIPreferences}
               >
                 Reset UI
+              </button>
+              <button
+                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                  highContrast
+                    ? "border-rose-700 bg-rose-900/50 text-rose-200 hover:border-rose-500"
+                    : "border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-300"
+                }`}
+                onClick={resetProgress}
+              >
+                Reiniciar progreso
               </button>
             </div>
           </div>

@@ -13,3 +13,7 @@ export function loadState() {
 export function saveState(state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
+
+export function clearState() {
+  localStorage.removeItem(STORAGE_KEY);
+}
